@@ -20,6 +20,6 @@ Each exercise should have a function dedicated to it with the expected arguments
 
 - Provide the top 3 airlines with an average difference in expected arrival and actual arrival and their standard deviation
 
-- Given a city, airport create a model within a function that provides a probability of a flight getting cancelled
+- Given a city and airport code create a model within a function that provides a probability of a flight getting cancelled
 
-- Given airport, city and weather description create a model within a function to predict the proability of departure flight delay from the airport
+- Given an airport code, city and weather description create a model within a function to predict the proability of departure flight delay from the airport
