@@ -3,18 +3,19 @@ import numpy as np
 import datetime
 
 
-# cancellationFiles = ["data/Delay&Cancellation/" + x for x in ["2009.csv",
-# 															  "2010.csv",
-# 															  "2011.csv",
-# 															  "2012.csv",
-# 															  "2013.csv",
-# 															  "2014.csv",
-# 															  "2015.csv",
-# 															  "2016.csv",
-# 															  "2017.csv",
-# 															  "2018.csv"]]
+cancellationFiles = ["data/Delay&Cancellation/" + x for x in ["2009.csv",
+															  "2010.csv",
+															  "2011.csv",
+															  "2012.csv",
+															  "2013.csv",
+															  "2014.csv",
+															  "2015.csv",
+															  "2016.csv",
+															  "2017.csv",
+															  "2018.csv"]]
+weatherFile = "data/Weather/weather_description.csv"
 
-cancellationFiles = ["data/Delay&Cancellation/" + x for x in ["2017.csv"]]
+# cancellationFiles = ["data/Delay&Cancellation/" + x for x in ["2017.csv"]]
 
 def topDelayAirlines(verbose=False):
 	'''
@@ -24,9 +25,45 @@ def topDelayAirlines(verbose=False):
 		None
 	Output:
 		dict: Mapping airline to stddev of arrival delay
+
+	Approach:
+		Keep track of arrival differences through a dict; transform to dataframe and get metrics
 	'''
 
-	
+	airline_dict = {}
+	for filename in cancellationFiles:
+		if verbose: print("Reading data from " + filename)
+		chunk_read = pd.read_csv(filename, chunksize=1000000)
+		for chunk in chunk_read:
+			# For each airline: get a dataframe, append delay in dict 
+			for airline in chunk['OP_CARRIER'].unique():
+				if airline not in airline_dict:
+					airline_dict[airline] = []
+
+				#Extract Arrival delay from respective airline
+				airline_dict[airline].extend(chunk[chunk['OP_CARRIER'] == airline]['ARR_DELAY'].dropna().values)
+
+	#Convert lists to pandas Series so we don't run into pandas issues when casting
+	for airline in airline_dict:
+		airline_dict[airline] = pd.Series(airline_dict[airline])
+	delay_df = pd.DataFrame(airline_dict)
+
+	#Get mean & stddev of airlines
+	results_df = pd.DataFrame()
+	results_df['mean'] = delay_df.mean(axis=0)
+	results_df['stddev'] = delay_df.std(axis=0)
+
+	# Return top 3 based on mean
+	return results_df.sort_values(by="mean", ascending=False).head(3)
+
+	'''
+		mean     stddev
+	VX  11.149536  42.773900
+	B6  10.977184  51.785661
+	EV   8.027348  62.579603
+	'''
+
+
 
 def averageRainDelay(city, airport, verbose=False):
 	'''
@@ -38,10 +75,13 @@ def averageRainDelay(city, airport, verbose=False):
 
 	Output:
 		averageRainDelay: float
+
+	Approach: 
+		Get days that rained in a city, filter airline data by these days/airport, extract delay data
 	'''
 	
 	#Load our data, in particular the weather for our city
-	weather_df = pd.read_csv("data/Weather/weather_description.csv")
+	weather_df = pd.read_csv(weatherFile)
 	
 	try:
 		city_df = weather_df[['datetime',city]]
@@ -83,7 +123,8 @@ def averageRainDelay(city, airport, verbose=False):
 			
 
 	return rainy_delays[0].mean()
-	# 12.51768244458
+
+	# Atlanta, ATL: 12.51768244458
 
 
 def worstTravelDays(city, airport, verbose=False):
@@ -98,6 +139,9 @@ def worstTravelDays(city, airport, verbose=False):
 
 	Output:
 		Sorted list of days of the week and highest average delay
+
+	Approach: 
+		Keep structure to track delays of each day of week, extract metrics after all data has been tracked
 	'''
 
 	# Create storage for delay times for days of the week
@@ -123,6 +167,18 @@ def worstTravelDays(city, airport, verbose=False):
 
 	day_delays = [x.mean() for x in day_dfs]
 	return np.argmax(day_delays), day_delays
+	'''
+	Atlanta, ATL:
+		0
+		[   11.012215
+		    8.355434
+		    8.745895
+		    10.206612
+		    10.935639
+		    7.176773
+		    9.189768
+		]
+	'''
 			
 
 def cancellationProbability(city, airport, verbose=False):
@@ -135,6 +191,9 @@ def cancellationProbability(city, airport, verbose=False):
 
 	Output:
 		float: probability of flight getting cancelled
+
+	Approach: 
+		Filter flight data on airport, calculate ratio of cancelled to total flights
 	'''
 
 	# Calculate the ratio of cancelled to uncancelled flights for a certain airport
@@ -157,6 +216,7 @@ def cancellationProbability(city, airport, verbose=False):
 
 	return float(cancelled_flights/total_flights)
 
+	# Atlanta, ATL: 0.011344666128994242
 
 
 def delayProbability(city, airport, weather_desc, verbose = False):
@@ -170,12 +230,15 @@ def delayProbability(city, airport, weather_desc, verbose = False):
 
 	Output:
 		float: probability of flight getting delayed
+
+	Approach:
+		Get all days that experienced weather, filter flight data by these dates/airport, keep count of delayed flights
 	'''
 
 	delayed_flights, total_flights = 0, 0
 
 	# Load our data
-	weather_df = pd.read_csv("data/Weather/weather_description.csv")
+	weather_df = pd.read_csv(weatherFile)
 	
 	try:
 		city_df = weather_df[['datetime', city]]
@@ -213,17 +276,13 @@ def delayProbability(city, airport, weather_desc, verbose = False):
 
 	return delayed_flights / total_flights
 
-
-def test():
-	df = pd.DataFrame(columns=['test'])
-	for i in range(10):
-		df['test'] = df['test'].append(pd.Series([1,2,3]))
-	print(df)
+	#Atlanta, ATL, "sky is clear": 0.35335226279868004
 
 
 if __name__ == "__main__":
-	# test()
-	# print(averageRainDelay("Atlanta", "ATL"))
-	# print(worstTravelDays("Atlanta", "ATL"))
+	# print(averageRainDelay("Atlanta", "ATL", verbose=True))
+	# print(worstTravelDays("Atlanta", "ATL", verbose=True))
 	# print(cancellationProbability("Atlanta", "ATL", verbose=True))
 	# print(delayProbability("Atlanta", "ATL", "sky is clear", verbose=True))
+	# print(topDelayAirlines(verbose=True))
+	pass
